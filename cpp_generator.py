@@ -6,49 +6,84 @@ import CppHeaderParser
 def handle_class_member_functions(classes):
     lines = []
     for cname, cv in classes.items():
-        lines.extend(handle_fuctions(cv['methods']['public'], cname))
-        lines.extend(handle_fuctions(cv['methods']['private'], cname))
+        if not cv.get('template'):
+            lines.extend(handle_fuctions(cv['methods']['public'], classes))
+            lines.extend(handle_fuctions(cv['methods']['private'], classes))
     return lines
+
+def get_func_ret(func, classes=None):
+    rettp = func['returns'].strip().split(' ')[-1::]
+    if func['constructor'] or func['destructor'] or not rettp:
+        return '', ''
+
+    rettp = rettp[0]
+    retv = 'return NULL;'
+    if rettp == 'double':
+        retv = 'return 0.0;'
+    elif rettp in ['float', 'int', 'bool']:
+        retv = 'return '+str(eval(rettp+'(0)')).lower()+';'
+    elif rettp=='void':
+        retv = ''
+    #namespace
+    if classes:
+        clsinst = classes.get(rettp)
+        if clsinst and clsinst['namespace']:
+            rettp = clsinst['namespace'] + '::' + rettp
+    # const
+    if func['returns_pointer']:
+        rettp += '*'
+    elif func['returns_reference']:
+        rettp += '&'
+        retv = 'return *(this);'
+    ret_const = func.get('returns_const')
+    if ret_const:
+        if 'void' in func['rtnType'] and rettp.endswith('*'):
+            rettp = rettp[:-1:] + ' const ' + rettp[-1::]
+        else:
+            rettp ='const ' + rettp
+
+    return rettp, retv
+
+
+def get_func_params(parameters):
+    params = []
+    for param in parameters:
+        spar = ''
+        if param.get('const'):
+            spar += 'const '  # const
+        spar += param['raw_type']
+        if param['pointer']:
+            spar += '*'
+        elif param['reference']:
+            spar += '&'
+        spar = spar + ' ' +  param['name']
+        params.append(spar)
+    return ','.join(params)
 
 def handle_fuctions(functions, clsname=None):
     lines = []
     for func in functions:
         try:
-            if not func['inline']:
-                fh = func['debug'].strip(' \t\n;')
-                if func['static']:
-                    fh = fh[6::]
-                if func['virtual']:
-                    print(fh, func['returns'])
-                else:
-                    print(func['returns'])
-                fh = fh.strip()
-                rettp =  func['returns'].strip(' \t')
-                if clsname:
-                    sep = len(rettp)+1
-                    fh = fh[:sep:] + clsname+ '::' +fh[sep::].lstrip()
-                ret = func['returns_pointer']
-                if not ret:
-                    rettp = rettp.split(' ')
-                    if len(rettp)>1:
-                        fh = fh[len(rettp[0])::]
-                ns = func['namespace']
+            if not func.get('inline') and not func.get('defined'):
+                #retval [classname::]function(paramter list) [const]
+                rettp, retv = get_func_ret(func, clsname)
                 code ='''
-%s%s
+%s %s%s(%s) %s
 {
-    return NULL;
+    %s
 }
-                ''' %(ns if ns else '', fh.rstrip(), )
+''' %(rettp, '%s::' %(func['path'],) if func.get('path') else '', func['name'],
+      get_func_params(func['parameters']), 'const' if func.get('const') else '', retv )
                 lines.extend(code.splitlines())
         except Exception as e:
-            print(func, e)
+            print(e)
     return [line+'\n' for line in lines]
 
 
 def generate_cpp_file(dstpath, fname, hdrdef):
-    lines = ['#include "%s.h"\n' %(fname)]
+    lines = ['#include "stdafx.h"\n', '#include "%s.h"\n' %(fname)]
     with open(os.path.join(dstpath, fname+'.cpp'), 'wt') as fp:
-        #lines.extend(handle_fuctions(hdrdef.functions))
+        lines.extend(handle_fuctions(hdrdef.functions, hdrdef.classes))
         lines.extend(handle_class_member_functions(hdrdef.classes))
         fp.writelines(lines)
 
