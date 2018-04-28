@@ -49,8 +49,8 @@ def get_func_params(parameters):
     params = []
     for param in parameters:
         spar = ''
-        if param.get('const'):
-            spar += 'const '  # const
+        if param.get('constant'):
+            spar = 'const ' + spar  # const
         spar += param['raw_type']
         if param['pointer']:
             spar += '*'
@@ -64,7 +64,7 @@ def handle_fuctions(functions, clsname=None):
     lines = []
     for func in functions:
         try:
-            if not func.get('inline') and not func.get('defined'):
+            if not func.get('inline') and not func.get('defined') and func.get('virtual'):
                 #retval [classname::]function(paramter list) [const]
                 rettp, retv = get_func_ret(func, clsname)
                 code ='''
