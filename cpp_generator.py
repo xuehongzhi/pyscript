@@ -9,6 +9,7 @@ def handle_class_member_functions(classes):
         if not cv.get('template'):
             lines.extend(handle_fuctions(cv['methods']['public'], classes))
             lines.extend(handle_fuctions(cv['methods']['private'], classes))
+            lines.extend(handle_fuctions(cv['methods']['protected'], classes))
     return lines
 
 def get_func_ret(func, classes=None):
@@ -64,15 +65,18 @@ def handle_fuctions(functions, clsname=None):
     lines = []
     for func in functions:
         try:
-            if not func.get('inline') and not func.get('defined') and func.get('virtual'):
+            if not func.get('inline') and not func.get('defined') and not func.get('pure_virtual'):
                 #retval [classname::]function(paramter list) [const]
                 rettp, retv = get_func_ret(func, clsname)
+                funcname = func['name']
+                if func.get('destructor'):
+                    funcname = '~'+funcname
                 code ='''
 %s %s%s(%s) %s
 {
     %s
 }
-''' %(rettp, '%s::' %(func['path'],) if func.get('path') else '', func['name'],
+''' %(rettp, '%s::' %(func['path'],) if func.get('path') else '', funcname,
       get_func_params(func['parameters']), 'const' if func.get('const') else '', retv )
                 lines.extend(code.splitlines())
         except Exception as e:
