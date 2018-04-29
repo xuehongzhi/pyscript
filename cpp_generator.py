@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import CppHeaderParser
+from tempfile import gettempdir
 
 def handle_class_member_functions(classes):
     lines = []
@@ -58,6 +59,12 @@ def get_func_params(parameters):
         elif param['reference']:
             spar += '&'
         spar = spar + ' ' +  param['name']
+        if param.get('array'):
+            spar += '['
+            sz = param.get('array_size')
+            if sz:
+                spar += str(sz)
+            spar += ']'
         params.append(spar)
     return ','.join(params)
 
@@ -91,6 +98,24 @@ def generate_cpp_file(dstpath, fname, hdrdef):
         lines.extend(handle_class_member_functions(hdrdef.classes))
         fp.writelines(lines)
 
+#预处理头文件,去掉class前面的修饰符
+def preprocss_header(fpath, tempdir, fname):
+    os.makedirs(tempdir, exist_ok = True)
+    tempath = os.path.join(tempdir, fname)
+    lines = []
+    with open(fpath, 'rt') as rfp, open(tempath, 'wt') as wfp:
+        for line in rfp.readlines():
+            pl = line.strip();
+            if pl.startswith('class'):
+                e = pl.index(':') if ':' in pl else len(pl)
+                clsname = pl[5:e:].strip()
+                decorator, _ ,clsname = clsname.rpartition(' ')
+                if decorator:
+                    line = line.replace(decorator+' ', '')
+            lines.append(line)
+        wfp.writelines(lines)
+    return tempath
+
 def extract_file(fpath, dstpath, fname):
     try:
         os.makedirs(dstpath, exist_ok = True)
@@ -98,7 +123,7 @@ def extract_file(fpath, dstpath, fname):
         generate_cpp_file(dstpath, fname, hdrdef)
         print("%s convert success!!" %(fpath, ))
     except Exception as e:
-           print("%s convert failed, reason:(%s)" %(fpath, str(e)))
+        print("%s convert failed, reason:(%s)" %(fpath, str(e)))
                     #SingleConverter(book, dstpath).convert()
 
 if __name__ == "__main__":
@@ -121,7 +146,13 @@ if __name__ == "__main__":
                 if '.h' in f:
                     fpath = os.path.join(dirpath, f)
                     fn, _ = os.path.splitext(os.path.basename(f))
+                    tempdir = os.path.join(gettempdir(), os.path.basename(dirpath))
+                    fpath = preprocss_header(fpath, tempdir, f)
                     extract_file(fpath, os.path.normpath(dstpath), fn)
     else:
         fn, _ = os.path.splitext(os.path.basename(args.srcpath))
-        extract_file(args.srcpath, dstpath, fn)
+        tempath = preprocss_header(args.srcpath,
+                                   os.path.join(gettempdir(), os.path.basename(os.path.dirname(args.srcpath))),
+                                   fn)
+        print(tempath)
+        extract_file(tempath, dstpath, fn)
