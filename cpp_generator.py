@@ -106,9 +106,9 @@ def preprocss_header(fpath, tempdir, fname):
     with open(fpath, 'rt') as rfp, open(tempath, 'wt') as wfp:
         for line in rfp.readlines():
             pl = line.strip();
-            if pl.startswith('class'):
+            if pl.startswith('class') or pl.startswith('struct'):
                 e = pl.index(':') if ':' in pl else len(pl)
-                clsname = pl[5:e:].strip()
+                clsname = pl[pl.index(' '):e:].strip()
                 decorator, _ ,clsname = clsname.rpartition(' ')
                 if decorator:
                     line = line.replace(decorator+' ', '')
