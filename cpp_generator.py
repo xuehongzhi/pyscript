@@ -78,12 +78,17 @@ def handle_fuctions(functions, clsname=None):
                 funcname = func['name']
                 if func.get('destructor'):
                     funcname = '~'+funcname
+                func_prefix = ''
+                if func.get('path'):
+                    func_prefix = func['path']
+                elif func.get('namespace'): #普通函数命名空间处理
+                    func_prefix = func['namespace']
                 code ='''
 %s %s%s(%s) %s
 {
     %s
 }
-''' %(rettp, '%s::' %(func['path'],) if func.get('path') else '', funcname,
+''' %(rettp, '%s::' %(func_prefix, ) , funcname,
       get_func_params(func['parameters']), 'const' if func.get('const') else '', retv )
                 lines.extend(code.splitlines())
         except Exception as e:
