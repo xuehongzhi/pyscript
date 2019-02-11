@@ -4,7 +4,6 @@ import subprocess
 import argparse
 import glob
 import winreg as reg
-import platform
 '''
   https://docs.microsoft.com/en-us/visualstudio/install/create-an-offline-installation-of-visual-studio?view=vs-2017
 
@@ -20,13 +19,20 @@ def install_file(fpath, dstpath):
            print("%s install failed, reason:(%s)" %(fpath, str(e)))
                     #SingleConverter(book, dstpath).convert()
 
-def get_os_bit(filepath):
+
+
+
+def get_app_bit(dstpath):
     import struct
+    import platform
     IMAGE_FILE_MACHINE_I386=332
     IMAGE_FILE_MACHINE_IA64=512
     IMAGE_FILE_MACHINE_AMD64=34404
-    os_bit = None
+    filepath = glob.glob(os.path.join(dstpath, '*.dll'))[:1]
+    if not filepath:
+        return None
 
+    app_bit = 32
     with open(filepath, 'rb') as f:
         s=f.read(2)
         if s == 'MZ':
@@ -38,12 +44,13 @@ def get_os_bit(filepath):
             machine=struct.unpack("<H", s)[0]
 
             if machine==IMAGE_FILE_MACHINE_I386:
-                os_bit = 32
+                app_bit = 32
             elif machine==IMAGE_FILE_MACHINE_IA64:
-                os_bit = 64
+                app_bit = 64
             elif machine==IMAGE_FILE_MACHINE_AMD64:
                 os_bit = 64
-    return os_bit
+    return  app_bit
+
 
 
 def reg_visual_studio(dstpath):
@@ -53,15 +60,12 @@ def reg_visual_studio(dstpath):
     reg.SetValue(vc_key, '14.0', reg.REG_SZ, os.path.join(dstpath))
     # NETFRAMEWORK register
     # folder and version
-    osbit =  platform.architecture()[:2]
+    osbit = get_app_bit(dstpath)
+    ver = os.path.basename(dstpath)
     fwk_folder =  input("Enter .NET Framework Directory:")
     reg.SetValue(vc_key, 'FrameWorkDir{0}'.format(osbit), reg.REG_SZ, fwk_folder)
     fwk_ver =  input("Enter .NET Framework Version:")
     reg.SetValue(vc_key, 'FrameWorkVer{0}'.format(osbit), reg.REG_SZ, fwk_ver)
-
-
-
-
 
 
 
